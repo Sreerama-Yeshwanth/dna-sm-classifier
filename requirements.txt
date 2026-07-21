@@ -1,0 +1,12 @@
+# Core ML + data stack — pinned to the versions the notebook's results were produced with
+# (pinned for reproducible numbers; relax if you hit platform wheel issues)
+numpy==2.5.1
+pandas==3.0.3
+scipy==1.18.0
+scikit-learn==1.9.0
+lightgbm==4.7.0
+xgboost==3.3.0
+matplotlib==3.11.0
+
+# To open / run the notebook
+notebook>=7.0
