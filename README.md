@@ -1,6 +1,10 @@
-# Product Classification with Random Forest
+# Product Master-Data Classification
 
-This repository predicts five product master-data labels from three inputs:
+This repository contains open-source, in-tenant workflows for suggesting five product master-data labels without external LLM or API calls.
+
+## Random Forest Application
+
+The Random Forest workflow predicts labels from three inputs:
 
 - `GPCBrickCode`
 - `UNSPSCNumber`
