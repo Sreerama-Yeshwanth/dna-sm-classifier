@@ -1,43 +1,92 @@
-# Product Master-Data Field Classifier (lean)
+# Product Classification with Random Forest
 
-Auto-suggests values for five product master-data fields from a product's text and a few categorical
-attributes — entirely in-tenant with open-source models (no external LLM or API calls).
+This repository predicts five product master-data labels from three inputs:
 
-## What it does
+- `GPCBrickCode`
+- `UNSPSCNumber`
+- `ProductDescription`
 
-- Fuses seven short text columns and three categorical columns into features
-  (word + character TF-IDF + one-hot encoding), fitting on the training fold only (no leakage).
-- Benchmarks three models with leakage-safe 4-fold cross-validation:
-  **Logistic Regression** (recommended), **LightGBM**, **XGBoost**.
-- Reports macro-F1 (plus top-1 / top-3) per field, and per-class confusion matrices for the GPC Brick field.
+The solution trains one multiclass Random Forest per output label: `ProductType`, `ProductGroup`, `ProductFamily`, `ProductLine`, and `ProductKey`.
 
-## Headline result
+Each model combines train-fitted one-hot encodings of the two categorical codes with a 384-dimensional `all-MiniLM-L6-v2` description embedding. The Streamlit app returns ranked Top-1, Top-3, or Top-5 suggestions.
 
-Logistic Regression wins on **macro-F1** across all five fields — the fair, imbalance-aware metric.
-On raw top-1/top-3 the tree models are close. See the rendered chart and tables in the notebook.
+## Results
 
-## Viewing the notebook
+Held-out performance from the final Random Forest notebook:
 
-`product_classifier_lean.ipynb` renders directly on GitHub — the charts and tables are embedded, so no
-setup is needed just to read it.
+| Output | Top-1 | Top-3 | Top-5 |
+|---|---:|---:|---:|
+| Product Group | 77.8% | 92.0% | 95.5% |
+| Product Family | 62.7% | 82.0% | 87.8% |
+| Product Line | 52.6% | 66.1% | 72.9% |
+| Product Type | 64.2% | 88.9% | 96.5% |
+| Product Key | 57.3% | 84.3% | 89.5% |
 
-For the fully styled tables (GitHub can strip some HTML/CSS), open **`product_classifier_lean.html`** in a
-browser, or view the notebook through [nbviewer](https://nbviewer.org/).
+A controlled paired benchmark compares Random Forest with the local MiniLM cosine 1-NN approach from the comparison notebook. Both methods use the same cleaned records, rare-label policy, and held-out rows.
 
-## Running it
+## Repository Structure
 
-> **The dataset is not included.** The outputs in the notebook are pre-rendered from a private 523-row sample,
-> so re-running requires supplying your own CSV.
+```text
+.
+├── artifacts/                              # Models, encoders, embedding metadata
+├── datasets/                               # Full source workbook and sample CSV
+├── evaluation/                             # Paired benchmark, results, and report
+├── test_sets/                              # Exact held-out rows for each target
+├── product_classification_rf_3features_proba.ipynb
+├── product_type_classification_rf_3features_proba.ipynb
+├── semarchy_example_product 1.ipynb
+├── streamlit_app.py
+├── requirements.txt
+├── .gitattributes
+└── .gitignore
+```
 
-1. `python -m venv .venv && source .venv/bin/activate`  (Python 3.12 recommended)
-2. `pip install -r requirements.txt`
-3. Place your CSV at `data/product_master_sample_523.csv` — schema in [`data/README.md`](data/README.md).
-4. `jupyter notebook product_classifier_lean.ipynb`, then **Run All**.
+## Setup
 
-## Notes
+Python 3.12 is recommended.
 
-- Fully offline and open-source; no data leaves your environment.
-- **Macro-F1** is the headline metric because the data is imbalanced — plain accuracy can be inflated by simply
-  predicting the majority class, whereas macro-F1 weights every category equally.
-- Some visualization cells open collapsed (input hidden) in JupyterLab / Notebook 7; click the bar on the left
-  of a cell to expand its code.
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+The first embedding operation downloads `sentence-transformers/all-MiniLM-L6-v2` from Hugging Face and then uses the local cache.
+
+## Run the Streamlit App
+
+The repository must contain the 15 Joblib files under `artifacts/`.
+
+```bash
+streamlit run streamlit_app.py
+```
+
+Open the URL printed by Streamlit, normally `http://localhost:8501`.
+
+The app accepts the three input fields, supports one output or all five outputs, and returns 1, 3, or 5 ranked candidates with model probability values.
+
+## Reproduce Training
+
+Open and run `product_classification_rf_3features_proba.ipynb`.
+
+The notebook:
+
+1. Loads `datasets/product_classified_Full.xlsx`, sheet `in`.
+2. Removes rows where all three input fields are missing.
+3. Folds target classes with fewer than 10 rows into `Other`.
+4. Creates an independent target-stratified 80/20 split for each output.
+5. Fits each categorical encoder on training rows only.
+6. Embeds unique nonblank descriptions with MiniLM.
+7. Trains one 600-tree Random Forest per target.
+8. Evaluates Top-1, Top-3, and Top-5 performance.
+9. Writes held-out CSVs to `test_sets/`.
+10. Writes models, encoders, and metadata to `artifacts/`.
+
+## Reproduce the Paired Comparison
+
+After installing the requirements and ensuring the RF artifacts exist:
+
+```bash
+python evaluation/paired_rf_vs_1nn.py
+```
